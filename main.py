@@ -2,6 +2,11 @@
 # importando JSON
 import json
 
+import requests
+
+URL_GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
+URL_CLIMA = "https://api.open-meteo.com/v1/forecast"
+
 # variáveis
 
 ARQUIVO_FILTROS = "filtros_salvos.json"
@@ -148,6 +153,114 @@ def predefinicoes(tema_atual, modo_atual):
         return tema_atual, modo_atual
 
 
+def buscar_coordenadas(cidade):
+    """Converte o nome da cidade em (latitude, longitude, nome). Retorna None se falhar."""
+    try:
+        resposta = requests.get(
+            URL_GEOCODING,
+            params={"name": cidade, "count": 1, "language": "pt"},
+            timeout=5,
+        )
+        resposta.raise_for_status()
+        resultados = resposta.json().get("results")
+        if not resultados:
+            return None
+        local = resultados[0]
+        return local["latitude"], local["longitude"], local["name"]
+    except (requests.RequestException, KeyError, ValueError):
+        return None
+
+
+def buscar_clima(latitude, longitude):
+    """Consulta o clima atual na Open-Meteo. Retorna (codigo, e_dia) ou None se falhar."""
+    try:
+        resposta = requests.get(
+            URL_CLIMA,
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": "weather_code,is_day",
+            },
+            timeout=5,
+        )
+        resposta.raise_for_status()
+        atual = resposta.json()["current"]
+        return atual["weather_code"], atual["is_day"] == 1
+    except (requests.RequestException, KeyError, ValueError):
+        return None
+
+
+def recomendar_por_clima(codigo, e_dia):
+    """Recebe o código do clima e se é dia; devolve a recomendação de filtro, tema, modo e foco."""
+    if not e_dia:
+        return {"condicao": "Noite", "filtro": "Modo Encontro",
+                "tema": "Nenhum", "modo": "Escuro", "foco": 6}
+    if codigo == 0:
+        return {"condicao": "Ensolarado", "filtro": "Modo Viagem",
+                "tema": "Céu", "modo": "Claro", "foco": 12}
+    if codigo in (1, 2, 3):
+        return {"condicao": "Parcialmente nublado", "filtro": "Modo PopArt",
+                "tema": "Flores", "modo": "Claro", "foco": 10}
+    if codigo in (45, 48):
+        return {"condicao": "Neblina", "filtro": "Modo Estudo",
+                "tema": "Nenhum", "modo": "Claro", "foco": 8}
+    if 51 <= codigo <= 82:
+        return {"condicao": "Chuvoso", "filtro": "Modo Estudo",
+                "tema": "Nenhum", "modo": "Escuro", "foco": 8}
+    if codigo >= 95:
+        return {"condicao": "Tempestade", "filtro": "Modo PopArt",
+                "tema": "Laranja", "modo": "Escuro", "foco": 7}
+    return {"condicao": "Tempo variado", "filtro": "Modo Viagem",
+            "tema": "Nenhum", "modo": "Claro", "foco": 10}
+
+
+def menu_clima():
+    """Pede a cidade, consulta o clima e oferece a recomendação. Retorna a recomendação aceita ou None."""
+    print("Opção 5 - Recomendação pelo clima")
+    print("-" * 6)
+    while True:
+        cidade = input("Digite sua cidade (ou 'retornar'): ").strip()
+        if cidade.lower() in ["retornar", "return"]:
+            print("Retornando ao menu...")
+            return None
+        if cidade == "":
+            print("Resposta Inválida! Digite o nome de uma cidade.")
+            continue
+
+        local = buscar_coordenadas(cidade)
+        if local is None:
+            print("Não encontrei essa cidade ou houve erro de conexão. Tente novamente.")
+            continue
+
+        latitude, longitude, nome = local
+        clima = buscar_clima(latitude, longitude)
+        if clima is None:
+            print("Não foi possível consultar o clima agora. Retornando ao menu...")
+            return None
+        break
+
+    codigo, e_dia = clima
+    rec = recomendar_por_clima(codigo, e_dia)
+
+    print("-" * 6)
+    print(f"Clima em {nome}: {rec['condicao']}")
+    print(f"Recomendamos: {rec['filtro']} | Tema {rec['tema']} | Modo {rec['modo']} | Foco {rec['foco']}")
+    print("-" * 6)
+    registrar_historico(f"Recomendação por clima em {nome} ({rec['condicao']}): {rec['filtro']}")
+
+    while True:
+        aplicar = input("Deseja aplicar essa recomendação? 'S' ou 'N': ").upper()
+        if aplicar in ["S", "SIM"]:
+            registrar_historico("Recomendação por clima aplicada.")
+            print("Recomendação aplicada! Retornando ao menu...")
+            return rec
+        elif aplicar in ["N", "NAO", "NÃO"]:
+            print("Ok! Retornando ao menu...")
+            return None
+        else:
+            print("Resposta Inválida! Digite novamente.")
+
+
 # código
 
 while True:
@@ -159,18 +272,19 @@ while True:
         print("2 - Filtros")
         print("3 - Predefinições")
         print("4 - Histórico de ações")
-        print("5 - Sair")
+        print("5 - Recomendação pelo clima")
+        print("6 - Sair")
         print("-" * 6)
 
         opcao = input("Digite sua opção: ")
-        if opcao in ["1", "2", "3", "4", "5"]:
+        if opcao in ["1", "2", "3", "4", "5", "6"]:
             opcao = int(opcao)
             break
 
         else:
             print('Opção inválida! Tente novamente.')
 
-    if opcao < 1 or opcao > 5:
+    if opcao < 1 or opcao > 6:
         print("Opção invalida!")
 
     elif opcao == 1:
@@ -406,5 +520,13 @@ while True:
         print("Retornando ao menu...")
 
     elif opcao == 5:
+        rec = menu_clima()
+        if rec:
+            filtro = rec["filtro"]
+            tema = rec["tema"]
+            modo = rec["modo"]
+            foco = rec["foco"]
+
+    elif opcao == 6:
         print("Obrigado por usar o MoodShot!")
         break
