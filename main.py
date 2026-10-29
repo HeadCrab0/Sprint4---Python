@@ -1,14 +1,12 @@
 # MOODSHOT v2.0
-# importando JSON
+# imports
 import json
-
 import requests
-
-URL_GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
-URL_CLIMA = "https://api.open-meteo.com/v1/forecast"
 
 # variáveis
 
+URL_GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
+URL_CLIMA = "https://api.open-meteo.com/v1/forecast"
 ARQUIVO_FILTROS = "filtros_salvos.json"
 ARQUIVO_HISTORICO = "historico.txt"
 filtro = "Nenhum"
@@ -16,7 +14,6 @@ foco = 10
 tema = "Nenhum"
 modo = "Escuro"
 opcao = "oi"
-
 
 # funções (+ variavel para salvar filtros personalizados)
 
@@ -318,7 +315,7 @@ while True:
         print(f"Filtro atual: {filtro}")
         print("-" * 6)
         print("1 - Filtros Default")
-        print("2 - Filtros Predefinidos (novo)")
+        print("2 - Filtros Predefinidos")
         print("3 - Retornar")
         print("-" * 6)
 
@@ -435,7 +432,7 @@ while True:
 
                 nome = input("Digite o nome do filtro: ")
 
-                # Adiciona no dicionário e já salva no arquivo JSON
+                # salva no arquivo JSON
                 personalizado[nome] = (fc, sat, vin, cor)
                 salvar_filtros(personalizado)
 
