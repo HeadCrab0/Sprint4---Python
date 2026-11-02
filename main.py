@@ -1,4 +1,4 @@
-# MOODSHOT v2.0w
+# MOODSHOT v2.1w
 # Gerenciador de perfis e filtros de câmera via prompt.
 
 # imports
